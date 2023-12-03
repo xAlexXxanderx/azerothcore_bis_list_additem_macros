@@ -1,4 +1,5 @@
 import os
+import sys
 from dotenv import load_dotenv
 import pymysql
 import argparse
@@ -53,11 +54,16 @@ DATABASE_USER_NAME = os.environ.get("DATABASE_USER_NAME")
 DATABASE_PASSWORD = os.environ.get("DATABASE_PASSWORD")
 TABLE_NAME = os.environ.get("TABLE_NAME")
 
+sdm_id = -1
+bis_dict = {}
 bis_list = get_item_list(path_to_bis_list_file)
 for i in bis_list:
     if '[' not in i:
-        if '#' in i: 
-            print(i)
+        if '##' in i:
+            if 'Template' not in i:
+                sdm_id = sdm_id + 1
+                bis_dict[sdm_id] = [i]
+                #print(i)
     else:
         crop_one = i.split('[')[0]
         crop_two = i.split(']')[1]
@@ -65,7 +71,46 @@ for i in bis_list:
         if len(item_name) > 0:
             command = '.additem '+str(get_item_id(item_name))
             if 'Error' not in command:
-                print(command)
+                bis_dict[sdm_id].append(command)
+                #print(command)
             else:
                 print('Error with '+item_name)
                 break
+                sys.exit()
+
+sdm_config = '''sdm_version = "1.8.3"
+sdm_listFilters = {
+	["true"] = true,
+	["s"] = true,
+	["b"] = true,
+	["false"] = true,
+	["global"] = true,
+	["f"] = true,
+}
+sdm_iconSize = 36
+sdm_mainContents = {
+'''
+
+for key in bis_dict:
+    sdm_config = sdm_config+'	'+str(key)+', -- ['+str(key)+']\n'
+
+sdm_config = sdm_config + '''}
+sdm_macros = {'''
+
+
+for key in bis_dict:
+    sdm_config = sdm_config + '''
+	{
+		["type"] = "b",
+		["name"] = "'''+bis_dict[key][0].replace('## ','').replace(' ','')+'''",
+		["ID"] = '''+str(key)+''',
+		["text"] = "'''+'\\n'.join(bis_dict[key])+'''",
+		["icon"] = 1,
+	}, -- ['''+str(key)+''']'''
+
+sdm_config = sdm_config + '\n}'
+
+with open(current_path+'/SuperDuperMacro.lua', 'w') as f:
+    f.write(sdm_config)
+
+print('Done!')
